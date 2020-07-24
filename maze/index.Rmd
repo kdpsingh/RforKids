@@ -1,0 +1,132 @@
+---
+title: "R for Kids - Maze"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(shiny)
+library(shinyjs)
+library(magick)
+
+maze = image_read('maze_background.png') %>% 
+  image_resize('500x500')
+
+arvind_big = image_read("arvind.png") %>% 
+  image_fill(point = '+0+0', color='none')
+  
+arvind_right = arvind_big %>%  
+  image_resize('30x30')
+
+arvind_left = arvind_right %>% image_flop()
+
+orig_xloc = 20
+orig_yloc = 40
+speed = 5
+direction = 'right'
+win = 'no'
+```
+
+```{r}
+useShinyjs(rmd = TRUE)
+
+tags$style(type="text/css",
+        ".recalculating {opacity: 1.0;}"
+    )
+
+tags$script('
+    $(document).on("keydown", function (e) {
+       Shiny.onInputChange("mydata", e.which);
+    });
+  ') 
+
+imageOutput('game_plot', click = 'image_click')
+```
+
+```{r}
+output$game_plot = renderImage({
+ invalidateLater(125)
+  
+  # Render original image
+  if (direction == 'left') {
+    orig_image = image_composite(maze, arvind_left,
+                                 offset = paste0('+',orig_xloc,'+',orig_yloc),
+                                 operator = 'over')
+  } else {
+    orig_image = image_composite(maze, arvind_right,
+                                 offset = paste0('+',orig_xloc,'+',orig_yloc),
+                                 operator = 'over')
+  }
+  
+  new_xloc = orig_xloc
+  new_yloc = orig_yloc
+  
+  if (!is.null(input$mydata)) {
+  
+    if (input$mydata == 37) { # left
+      new_xloc = pmax(orig_xloc - speed, 10)
+      direction <<- 'left'
+    } else if (input$mydata == 39) { # right
+      new_xloc = pmin(orig_xloc + speed,
+                      image_info(maze)$width - image_info(arvind_left)$width)
+      direction <<- 'right'
+    } else if (input$mydata == 38) { # up
+      new_yloc = pmax(orig_yloc - speed, 10)
+    } else if (input$mydata == 40) { # down
+      new_yloc = pmin(orig_yloc + speed,
+                      image_info(maze)$height  - image_info(arvind_left)$height)
+
+    }
+  }
+
+  # Render updated image (after moving)
+  if (direction == 'left') {
+    updated_image = 
+      image_composite(maze, arvind_left,
+                      offset = paste0('+', new_xloc,'+', new_yloc),
+                      operator = 'over')
+  } else {
+    updated_image = 
+      image_composite(maze, arvind_right,
+                      offset = paste0('+', new_xloc,'+', new_yloc),
+                      operator = 'over')
+  }
+  
+  orig_pixel_sum = orig_image %>%  image_data(channels = 'gray') %>% as.integer() %>% sum()
+  new_pixel_sum = updated_image %>% image_data(channels = 'gray') %>% as.integer() %>% sum()
+ 
+  if (orig_pixel_sum != new_pixel_sum) { # collision
+    updated_image = orig_image
+    speed <<- pmax(speed - 1, 1)
+  } else { # no collision
+    orig_xloc <<- new_xloc
+    orig_yloc <<- new_yloc
+    speed <<- pmin(speed + 1, 10)
+  }
+  
+  if (orig_xloc >= 430 & orig_yloc >= 400) {
+    win <<- 'yes'
+  }
+  
+  if (win == 'no') {
+    image_file = 
+      updated_image %>% 
+      image_write('game_board_img.png', format = 'png')
+  } else {
+    image_file = 
+      c(arvind_big %>% image_resize('400x400'),
+        image_blank(width = 500,height = 500) %>%
+          image_annotate('You win!', size = 50, location = '+100+400')) %>%
+      image_mosaic() %>% 
+      image_write('game_board_img.png', format = 'png')
+  }
+  
+    list(src = image_file, contentType = "image/png")
+})
+```
+
+
+
+
