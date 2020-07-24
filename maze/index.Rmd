@@ -43,11 +43,9 @@ tags$script('
   ') 
 
 imageOutput('game_plot', click = 'image_click')
-```
 
-```{r}
 output$game_plot = renderImage({
- invalidateLater(125)
+ invalidateLater(125) # re-render every 125 milliseconds
   
   # Render original image
   if (direction == 'left') {
@@ -77,7 +75,6 @@ output$game_plot = renderImage({
     } else if (input$mydata == 40) { # down
       new_yloc = pmin(orig_yloc + speed,
                       image_info(maze)$height  - image_info(arvind_left)$height)
-
     }
   }
 
@@ -115,11 +112,9 @@ output$game_plot = renderImage({
       updated_image %>% 
       image_write('game_board_img.png', format = 'png')
   } else {
+    html(selector='.title', html = 'You win!')
     image_file = 
-      c(arvind_big %>% image_resize('400x400'),
-        image_blank(width = 500,height = 500) %>%
-          image_annotate('You win!', size = 50, location = '+100+400')) %>%
-      image_mosaic() %>% 
+      arvind_big %>% image_resize('500x500') %>%  
       image_write('game_board_img.png', format = 'png')
   }
   
